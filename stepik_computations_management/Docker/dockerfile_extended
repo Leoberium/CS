@@ -1,0 +1,9 @@
+FROM ubuntu:16.04
+WORKDIR /home/stepik
+RUN apt update && apt install nano
+ENV EDITOR=/bin/nano
+ARG UID=1000
+RUN useradd -u $UID -d /home/stepik stepik
+USER $UID
+VOLUME ["/home/stepik"]
+ENTRYPOINT ["/bin/nano"]

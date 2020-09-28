@@ -1,0 +1,81 @@
+samples, = glob_wildcards("input/{sample}.bam")
+callers = ['freebayes', 'haplotype_caller', 'samtools']
+pairs = [
+    '-'.join((callers[0], callers[1])),
+    '-'.join((callers[0], callers[2])),
+    '-'.join((callers[1], callers[2]))
+]
+
+import re
+r = re.compile('\d+(?=\sout\sof\sa\spossible)')
+def counts_retriever(filename):
+    x = shell("vcftools --gzvcf {} 2>&1".format(filename), iterable=True)
+    return(r.search(list(x)[9]).group())
+
+rule all:
+    input:
+        expand("output/reports/{sample}", sample=samples)
+
+rule counter:
+    input:
+        single = expand("output/{caller}/{{sample}}.vcf.gz", caller=callers),
+        intersections = expand("output/{pair}/{{sample}}.vcf.gz", pair=pairs)
+    output: "output/reports/{sample}"
+    run:
+        a = [['None'] * 3 for _ in range(3)]
+        for i in range(3):
+            a[i][0] = counts_retriever(input.single[i])
+        a[0][1] = counts_retriever(input.intersections[0])
+        a[0][2] = counts_retriever(input.intersections[1])
+        a[1][2] = counts_retriever(input.intersections[2])
+        open(output[0], 'w').writelines(['\t'.join(x) + '\n' for x in a])
+
+rule intersect_variants:
+    input:
+        "output/{caller1}/{sample}.vcf.gz",
+        "output/{caller2}/{sample}.vcf.gz"
+    output:
+        "output/{caller1}-{caller2}/{sample}.vcf.gz"
+    shell:
+        "vcf-isec -f -n +2 {input} | bgzip -c > {output}"
+
+rule index_vcf:
+    input: "output/{caller}/{sample}.vcf"
+    output:
+        "output/{caller}/{sample}.vcf.gz",
+        "output/{caller}/{sample}.vcf.gz.tbi"
+    shell: "bgzip {input}; tabix -p vcf {input}.gz"
+
+rule freebayes:
+    input: "data/22.fa", "input/{sample}.bam", "data/22.fa.fai"
+    output: "output/freebayes/{sample}.vcf"
+    shell: "freebayes -f {input[0]} {input[1]} > {output}"
+
+rule haplotype_caller:
+    input:
+        "data/22.fa", "input/{sample}.bam",
+        "data/22.fa.fai", "data/22.dict", "input/{sample}.bam.bai"
+    output: "output/haplotype_caller/{sample}.vcf"
+    shell: "java -jar $GATK -R {input[0]} -T HaplotypeCaller -I {input[1]} \
+    -o {output}"
+
+rule samtools:
+    input: "data/22.fa", "input/{sample}.bam", "data/22.fa.fai"
+    output: "output/samtools/{sample}.vcf"
+    shell: "samtools mpileup -uf {input[0]} {input[1]} | \
+    bcftools view -vcg - > {output}"
+
+rule reference_index:
+    input: "data/22.fa"
+    output: "data/22.fa.fai"
+    shell: "samtools faidx {input} > {output}"
+
+rule reference_dict:
+    input: "data/22.fa"
+    output: "data/22.dict"
+    shell: "java -jar $PICARD CreateSequenceDictionary R={input} O={output}"
+
+rule bam_index:
+    input: "input/{sample}.bam"
+    output: "input/{sample}.bam.bai"
+    shell: "samtools index {input} > {output}"

@@ -1,0 +1,13 @@
+files, = glob_wildcards("input/{file, \w.*}")
+
+rule all:
+	input: expand("output/{file}", file=files)
+
+rule count_symbols:
+	input: "input/{file}"
+	output: "output/{file}"
+	run:
+		chars = open(input[0], 'r').read().strip()
+		uniq = sorted(set(chars))
+		open(output[0], 'w').writelines('{}: {}\n'.format(ch, chars.count(ch))
+		for ch in uniq if ch.isalnum())

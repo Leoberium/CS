@@ -1,0 +1,7 @@
+FROM ubuntu:14.04 
+
+# Change entrypoint
+ENTRYPOINT ["/usr/bin/printf", "Hello %s!\n"]
+
+# Change arguments
+CMD ["World"]

@@ -1,0 +1,9 @@
+ids = glob_wildcards("input/{file, \w.*}")
+
+rule all:
+	input: expand("output/{file}", file=ids.file)
+
+rule hello:
+	input: "input/{file}"
+	output: "output/{file}"
+	shell: "echo Hello $(cat {input})! > {output}"
