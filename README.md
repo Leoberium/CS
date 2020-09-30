@@ -1,1 +1,1 @@
-# CS
+In this repository I study computer science via online courses, videos and tutorials. 
