@@ -1,6 +1,5 @@
 #include <iostream>
 
-
 struct vector {
     size_t arr_size;
     int *left, *right;
