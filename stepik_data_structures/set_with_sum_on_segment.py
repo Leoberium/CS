@@ -9,6 +9,23 @@ class Node:
         self.right_child = None
         self.parent = None
 
+    def successor(self):
+
+        if self.right_child is not None:
+            current = self.right_child
+            while current.left_child is not None:
+                current = current.left_child
+            return current
+
+        else:
+            current = self
+            while current.parent is not None:
+                if current == current.parent.left_child:
+                    return current.parent
+                else:
+                    current = current.parent
+            return None
+
 
 class AVLTree:
 
@@ -76,21 +93,6 @@ class AVLTree:
         else:
             pass
 
-    def successor(self, node):
-        if node.right_child is not None:
-            current = node.right_child
-            while current.left_child is not None:
-                current = current.left_child
-            return current
-        else:
-            current = node
-            while current.parent is not None:
-                if current == current.parent.left_child:
-                    return current.parent
-                else:
-                    current = current.parent
-            return None
-
     def size(self):
         return self.size
 
@@ -102,8 +104,16 @@ class AVLTree:
         return True if self.size == 0 else False
 
 
+def test_tree():
+    pass
+
+
 def main():
     n = int(sys.stdin.readline().strip())
     for _ in range(n):
         op, *args = sys.stdin.readline().strip().split(" ")
+
+
+if __name__ == '__main__':
+    main()
 
