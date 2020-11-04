@@ -1,6 +1,6 @@
 import sys
 from math import log2
-from typing import Union
+from typing import Union, Tuple
 
 import hypothesis.strategies as st
 from hypothesis import given, settings
@@ -265,6 +265,36 @@ class Node:
         self.parent = None  # remove last link from the node
         return parent.__balance()
 
+    def split_sums(self, key: int) -> Tuple[int, int]:
+        """Compute sum of all keys less than this one,
+        sum of all keys greater than this one and then return them."""
+        current = self
+        less, greater = 0, 0
+        while key != current.key:
+
+            if key < current.key:
+                # add all greater keys
+                greater += current.right.sum if current.right is not None else 0
+                greater += current.key
+
+                current = current.left  # traverse left
+
+            elif key > current.key:
+                # add all smaller keys
+                less += current.left.sum if current.left is not None else 0
+                less += current.key
+
+                current = current.right  # traverse right
+
+            if current is None:  # key not found
+                break
+
+        if current is not None:  # add from children
+            less += current.left.sum if current.left is not None else 0
+            greater += current.right.sum if current.right is not None else 0
+
+        return less, greater
+
 
 class AVLTree:
 
@@ -292,6 +322,11 @@ class AVLTree:
         return self.root.size if not self.empty() else 0
 
     @property
+    def sum(self) -> int:
+        """Return sum of all keys of the tree."""
+        return self.root.sum
+
+    @property
     def height(self) -> int:
         """Return the height of the tree."""
         return self.root.height if not self.empty() else 0
@@ -316,6 +351,8 @@ class AVLTree:
 
     def find(self, key: int) -> bool:
         """Return True if element with such key exists in the tree, otherwise False."""
+        if self.empty():
+            return False
         return self.root.find(key) is not None
 
     def insert(self, key: int) -> bool:
@@ -351,18 +388,45 @@ class AVLTree:
     def remove(self, key: int) -> bool:
         """Remove element with such key if it exists in the tree (return True),
          or return False otherwise."""
-        current = self.root.find(key)
+        current = self.root.find(key) if not self.empty() else None
         if current is None:  # if no such key, failure
             return False
 
         self.root = current.remove()  # update root
         return True
 
+    def segment_sum(self, left, right):
+        """Compute sum of all tree keys in segment [left, right]."""
+        if self.empty():
+            return 0
+        less, _ = self.root.split_sums(left)
+        _, greater = self.root.split_sums(right)
+        return self.sum - less - greater
+
+
+def f(x: int, s: int):
+    return (x + s) % 1000000001
+
 
 if __name__ == '__main__':
     n = int(sys.stdin.readline().strip())
+    tree = AVLTree()
+    ls = 0  # last sum
     for _ in range(n):
         op, *args = sys.stdin.readline().strip().split(" ")
+        if op == "+":
+            arg = f(int(args[0]), ls)
+            tree.insert(arg)
+        elif op == "-":
+            arg = f(int(args[0]), ls)
+            tree.remove(arg)
+        elif op == "?":
+            arg = f(int(args[0]), ls)
+            print("Found" if tree.find(arg) else "Not found")
+        else:
+            args = map(lambda x: f(int(x), ls), args)
+            ls = tree.segment_sum(*args)
+            print(ls)
 
 
 @given(st.lists(
@@ -370,21 +434,64 @@ if __name__ == '__main__':
     max_size=10000, unique=True))
 @settings(max_examples=250)
 def test_bst_properties(seq):
-    tree = AVLTree()
+    test_tree = AVLTree()
     for x in seq:
-        tree.insert(x)
-    assert list(tree) == sorted(seq)
-    assert tree.size == len(seq)
-    assert tree.height <= 1.44 * log2(1 + len(seq))
+        test_tree.insert(x)
+    assert list(test_tree) == sorted(seq)
+    assert test_tree.size == len(seq)
+    assert test_tree.height <= 1.44 * log2(1 + len(seq))
     if len(seq) >= 10:
-        assert tree.find(seq[5])
-        assert tree.find(seq[3])
-        assert tree.find(25) == (25 in seq)
-        assert tree.remove(seq.pop())
-        assert list(tree) == sorted(seq)
-        assert tree.remove(seq.pop())
-        assert list(tree) == sorted(seq)
-        assert tree.size == len(seq)
-        assert tree.find(seq[5])
-        assert tree.remove(seq.pop(len(seq) // 2))
-        assert list(tree) == sorted(seq)
+        assert test_tree.find(seq[5])
+        assert test_tree.find(seq[3])
+        assert test_tree.find(25) == (25 in seq)
+        assert test_tree.remove(seq.pop())
+        assert list(test_tree) == sorted(seq)
+        assert test_tree.remove(seq.pop())
+        assert list(test_tree) == sorted(seq)
+        assert test_tree.size == len(seq)
+        assert test_tree.find(seq[5])
+        assert test_tree.remove(seq.pop(len(seq) // 2))
+        assert list(test_tree) == sorted(seq)
+        assert test_tree[2] == sorted(seq)[1]
+        assert test_tree[test_tree.size] == sorted(seq)[len(seq)-1]
+
+
+def test_operations():
+    test_tree = AVLTree()
+    # round one
+    s = 0
+    assert not test_tree.find(f(1, s))  # find 1
+    assert test_tree.insert(f(1, s))  # add 1
+    assert test_tree.find(f(1, s))  # find 1
+    assert test_tree.insert(f(2, s))  # add 2
+    s = test_tree.segment_sum(f(1, s), f(2, s))  # sum(1, 2)
+    assert s == 3
+    assert not test_tree.insert(f(1000000000, s))  # add 2
+    assert test_tree.find(f(1000000000, s))  # find 2
+    assert test_tree.remove(f(1000000000, s))  # remove 2
+    assert not test_tree.remove(f(1000000000, s))  # find 2
+    s = test_tree.segment_sum(f(999999999, s), f(1000000000, s))  # sum(1, 2)
+    assert s == 1
+    assert not test_tree.remove(f(2, s))  # remove 3
+    assert not test_tree.find(f(2, s))  # find 3
+    assert test_tree.remove(f(0, s))  # remove 1
+    assert test_tree.insert(f(9, s))  # add 10
+    s = test_tree.segment_sum(f(0, s), f(9, s))  # sum(1, 10)
+    assert s == 10
+    test_tree.clear()
+    # round two
+    s = 0
+    assert not test_tree.find(f(0, s))
+    assert test_tree.insert(f(0, s))
+    assert test_tree.find(f(0, s))
+    assert test_tree.remove(f(0, s))
+    assert not test_tree.find(f(0, s))
+    test_tree.clear()
+    # round three
+    s = 0
+    assert test_tree.insert(f(491572259, s))
+    assert test_tree.find(f(491572259, s))
+    assert not test_tree.find(f(899375874, s))
+    s = test_tree.segment_sum(f(310971296, s), f(877523306, s))
+    assert s == 491572259
+    assert test_tree.insert(f(352411209, s))
