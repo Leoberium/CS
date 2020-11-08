@@ -1,3 +1,4 @@
+import zipfile
 import pandas as pd
 
 
@@ -50,5 +51,19 @@ def task5():
         print(" ".join(map(str, t[1:])))
 
 
+def task6():
+    data = []
+    with zipfile.ZipFile("rogaikopyta.zip") as z:
+        for file in z.namelist():
+            with z.open(file, "r") as t:
+                df = pd.read_excel(t, skiprows=1, header=None)
+                name, s = df.iloc[0, 1], int(df.iloc[0, 3])
+                data.append((name, s))
+    data.sort()
+    data = [" ".join(map(str, t)) + "\n" for t in data]
+    with open("answer.txt", "w") as o:
+        o.writelines(data)
+
+
 if __name__ == '__main__':
-    task5()
+    task6()
